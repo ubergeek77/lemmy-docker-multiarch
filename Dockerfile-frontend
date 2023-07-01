@@ -1,0 +1,66 @@
+# gobinaries.com is not reliable for container builds (external dependency)
+# It also does not support arm/arm64 (at least not right now)
+# We have to build node-prune from source
+FROM golang as go-builder
+WORKDIR /app
+RUN cd /app && \
+  git clone https://github.com/tj/node-prune && \
+  cd /app/node-prune && \
+  CGO_ENABLED=0 go build
+
+# Original Dockerfile below (mostly)
+FROM node:20.2-alpine as builder
+
+# Added vips-dev and pkgconfig so that local vips is used instead of prebuilt
+# Done for two reasons:
+# - libvips binaries are not available for ARM32
+# - It can break depending on the CPU (https://github.com/LemmyNet/lemmy-ui/issues/1566)
+RUN apk update && apk add curl yarn python3 build-base gcc wget git vips-dev pkgconfig --no-cache
+
+WORKDIR /usr/src/app
+
+ENV npm_config_target_platform=linux
+ENV npm_config_target_libc=musl
+
+# Cache deps
+COPY package.json yarn.lock ./
+RUN yarn --production --prefer-offline --pure-lockfile
+
+# Build
+COPY generate_translations.js \
+  tsconfig.json \
+  webpack.config.js \
+  .babelrc \
+  ./
+
+COPY lemmy-translations lemmy-translations
+COPY src src
+COPY .git .git
+
+# Set UI version 
+RUN echo "export const VERSION = '$(git describe --tag)';" > "src/shared/version.ts"
+
+RUN yarn --production --prefer-offline
+RUN yarn build:prod
+
+# Prune the image
+# Copy the manually built node-prune here
+RUN mkdir -p /usr/local/bin/
+COPY --from=go-builder /app/node-prune/node-prune /usr/local/bin/node-prune
+RUN chmod +x /usr/local/bin/node-prune
+RUN node-prune /usr/src/app/node_modules
+
+RUN rm -rf ./node_modules/import-sort-parser-typescript
+RUN rm -rf ./node_modules/typescript
+RUN rm -rf ./node_modules/npm
+
+RUN du -sh ./node_modules/* | sort -nr | grep '\dM.*'
+
+FROM node:alpine as runner
+RUN apk add vips-cpp
+COPY --from=builder /usr/src/app/dist /app/dist
+COPY --from=builder /usr/src/app/node_modules /app/node_modules
+
+EXPOSE 1234
+WORKDIR /app
+CMD node dist/js/server.js
