@@ -34,7 +34,7 @@ jobs:
           ec2-keypair-name: ${{ secrets.EC2_KEYPAIR }}
           ec2-security-group-id: ${{ secrets.EC2_SG }}
           github-repo: ${{ github.repository }}
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-x64-images:
     needs: launch-x64-runner
@@ -65,7 +65,7 @@ jobs:
         with:
           registry: ${{ env.DST_REGISTRY }}
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push frontend (${{ env.TAG }}, x64)
         uses: docker/build-push-action@v4
         with:
@@ -92,7 +92,7 @@ jobs:
         uses: ubergeek77/aws-ec2-spot-runner@v1
         with:
           shutdown-label: ${{ needs.launch-x64-runner.outputs.label }}
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           github-repo: ${{ github.repository }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -114,7 +114,7 @@ jobs:
           ec2-keypair-name: ${{ secrets.EC2_KEYPAIR }}
           ec2-security-group-id: ${{ secrets.EC2_SG }}
           github-repo: ${{ github.repository }}
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-arm-images:
     needs: launch-arm-runner
@@ -145,7 +145,7 @@ jobs:
         with:
           registry: ${{ env.DST_REGISTRY }}
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push frontend (${{ env.TAG }}, ARM32v7)
         uses: docker/build-push-action@v4
         with:
@@ -172,7 +172,7 @@ jobs:
         uses: ubergeek77/aws-ec2-spot-runner@v1
         with:
           shutdown-label: ${{ needs.launch-arm-runner.outputs.label }}
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           github-repo: ${{ github.repository }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -194,7 +194,7 @@ jobs:
           ec2-keypair-name: ${{ secrets.EC2_KEYPAIR }}
           ec2-security-group-id: ${{ secrets.EC2_SG }}
           github-repo: ${{ github.repository }}
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-arm64-images:
     needs: launch-arm64-runner
@@ -225,7 +225,7 @@ jobs:
         with:
           registry: ${{ env.DST_REGISTRY }}
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push frontend (${{ env.TAG }}, ARM64)
         uses: docker/build-push-action@v4
         with:
@@ -252,7 +252,7 @@ jobs:
         uses: ubergeek77/aws-ec2-spot-runner@v1
         with:
           shutdown-label: ${{ needs.launch-arm64-runner.outputs.label }}
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           github-repo: ${{ github.repository }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -266,7 +266,7 @@ jobs:
         with:
           registry: ${{ env.DST_REGISTRY }}
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Squash Frontend Multiarch Tags
         uses: ubergeek77/squash-docker-tags@v1
         with:
