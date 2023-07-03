@@ -56,7 +56,6 @@ jobs:
           ec2-security-group-id: ${{ secrets.EC2_SG }}
           github-repo: ${{ github.repository }}
           github-token: ${{ secrets.RUNNER_TOKEN }}
-          dry-run: true
       - name: Export Runner Label
         id: save-labels
         run: echo "${{ matrix.target-short }}_label=${{ steps.launch.outputs.label }}" >> $GITHUB_OUTPUT
