@@ -120,7 +120,7 @@ jobs:
           file: ./${{ env.FE_REPO }}/Dockerfile
           platforms: ${{ matrix.docker-target }}
           push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-debug:${{ env.FE_TAG }}-${{ matrix.target-short }}
+          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-staging:${{ env.FE_TAG }}-${{ matrix.target-short }}
       - name: Build and push Backend (${{ env.BE_TAG }}, ${{ matrix.docker-target }})
         if: github.event.inputs.be-tag != ''
         uses: docker/build-push-action@v4
@@ -129,7 +129,7 @@ jobs:
           file: ./${{ env.BE_REPO }}/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-debug:${{ env.BE_TAG }}-${{ matrix.target-short }}
+          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-staging:${{ env.BE_TAG }}-${{ matrix.target-short }}
   stop-runners:
     needs: [launch-runners,build-images]
     runs-on: ubuntu-latest
@@ -171,16 +171,16 @@ jobs:
         uses: ubergeek77/squash-docker-tags@v1
         with:
           source-tags: |
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-debug:${{ env.FE_TAG }}-x64
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-debug:${{ env.FE_TAG }}-arm
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-debug:${{ env.FE_TAG }}-arm64
-          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.FE_TAG }}
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-staging:${{ env.FE_TAG }}-amd64
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-staging:${{ env.FE_TAG }}-arm
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-staging:${{ env.FE_TAG }}-arm64
+          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}-staging:${{ env.FE_TAG }}
       - name: Squash Backend Multiarch Tags
         if: github.event.inputs.be-tag != ''
         uses: ubergeek77/squash-docker-tags@v1
         with:
           source-tags: |
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-debug:${{ env.BE_TAG }}-x64
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-debug:${{ env.BE_TAG }}-arm
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-debug:${{ env.BE_TAG }}-arm64
-          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-debug:${{ env.BE_TAG }}
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-staging:${{ env.BE_TAG }}-amd64
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-staging:${{ env.BE_TAG }}-arm
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-staging:${{ env.BE_TAG }}-arm64
+          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-staging:${{ env.BE_TAG }}
