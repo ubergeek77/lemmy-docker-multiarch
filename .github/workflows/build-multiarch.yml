@@ -61,9 +61,9 @@ jobs:
         id: save-labels
         run: echo "${{ matrix.target-short }}_label=${{ steps.launch.outputs.label }}" >> $GITHUB_OUTPUT
     outputs:
-      amd64_label: ${{ steps.launch.outputs.amd64_label }}
-      arm_label: ${{ steps.launch.outputs.arm_label }}
-      arm64_label: ${{ steps.launch.outputs.arm64_label }}
+      amd64_label: ${{ steps.save-labels.outputs.amd64_label }}
+      arm_label: ${{ steps.save-labels.outputs.arm_label }}
+      arm64_label: ${{ steps.save-labels.outputs.arm64_label }}
   build-images:
     needs: launch-runners
     if: github.event.inputs.fe-tag != '' || github.event.inputs.be-tag != ''
