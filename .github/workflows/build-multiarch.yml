@@ -3,9 +3,13 @@ name: Build Multiarch Images
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "The Lemmy tag to build"
-        required: true
+      be-tag:
+        description: "The Lemmy Backend tag to build"
+        required: false
+        type: string
+      fe-tag:
+        description: "The Lemmy Frontend tag to build"
+        required: false
         type: string
 
 env:
@@ -13,51 +17,95 @@ env:
   BE_REPO: lemmy
   FE_REPO: lemmy-ui
   DST_REGISTRY: ghcr.io
-  TAG: ${{ github.event.inputs.tag }}
+  BE_TAG: ${{ github.event.inputs.be-tag }}
+  FE_TAG: ${{ github.event.inputs.fe-tag }}
 
 jobs:
 
-  launch-x64-runner:
+  launch-runners:
     runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.launch.outputs.label}}
+    if: github.event.inputs.fe-tag != '' || github.event.inputs.be-tag != ''
+    strategy:
+      matrix:
+        include:
+          - runner-arch: "x64"
+            docker-target: "linux/amd64"
+            target-short: "amd64"
+            ec2-ami: "ami-024e6efaf93d85776"
+            ec2-instance-type: "c5d.large"
+          - runner-arch: "arm64"
+            docker-target: "linux/arm/v7"
+            target-short: "arm"
+            ec2-ami: "ami-08fdd91d87f63bb09"
+            ec2-instance-type: "c6gn.large"
+          - runner-arch: "arm64"
+            docker-target: "linux/arm64"
+            target-short: "arm64"
+            ec2-ami: "ami-08fdd91d87f63bb09"
+            ec2-instance-type: "c6gn.large"
     steps:
-      - id: launch
-        name: Launch Spot Runner
+      - name: Launch Spot Runner (${{ matrix.runner-arch }}, ${{ matrix.docker-target }})
+        id: launch
         uses: ubergeek77/aws-ec2-spot-runner@v1
         with:
-          ec2-ami: "ami-024e6efaf93d85776"
-          ec2-instance-type: "c5d.large"
-          runner-arch: "x64"
+          ec2-ami: ${{ matrix.ec2-ami }}
+          ec2-instance-type: ${{ matrix.ec2-instance-type }}
+          runner-arch: ${{ matrix.runner-arch }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           ec2-keypair-name: ${{ secrets.EC2_KEYPAIR }}
           ec2-security-group-id: ${{ secrets.EC2_SG }}
           github-repo: ${{ github.repository }}
           github-token: ${{ secrets.RUNNER_TOKEN }}
+      - name: Export Runner Label
+        id: save-labels
+        run: echo "${{ matrix.target-short }}_label=${{ steps.launch.outputs.label }}" >> $GITHUB_OUTPUT
+    outputs:
+      amd64_label: ${{ steps.save-labels.outputs.amd64_label }}
+      arm_label: ${{ steps.save-labels.outputs.arm_label }}
+      arm64_label: ${{ steps.save-labels.outputs.arm64_label }}
 
-  build-x64-images:
-    needs: launch-x64-runner
-    runs-on: ${{ needs.launch-x64-runner.outputs.label }}
+  build-images:
+    needs: launch-runners
+    if: github.event.inputs.fe-tag != '' || github.event.inputs.be-tag != ''
+    strategy:
+      matrix:
+        include:
+          - docker-target: "linux/amd64"
+            target-short: "amd64"
+            runs-on: ${{ needs.launch-runners.outputs.amd64_label }}
+          - docker-target: "linux/arm/v7"
+            target-short: "arm"
+            runs-on: ${{ needs.launch-runners.outputs.arm_label }}
+          - docker-target: "linux/arm64"
+            target-short: "arm64"
+            runs-on: ${{ needs.launch-runners.outputs.arm64_label }}
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - name: Checkout Build Files
         uses: actions/checkout@v3
-      - name: Checkout Lemmy Frontend Source (${{ env.TAG }})
+      - name: Checkout Lemmy Frontend Source (${{ env.FE_TAG }})
         uses: actions/checkout@v3
+        if: env.FE_TAG != ''
         with:
           repository: ${{ env.LEMMY_ORG }}/${{ env.FE_REPO }}
-          ref: ${{ env.TAG }}
+          ref: ${{ env.FE_TAG }}
           path: ${{ env.FE_REPO }}
           submodules: recursive
-      - name: Checkout Lemmy Backend Source (${{ env.TAG }})
+      - name: Checkout Lemmy Backend Source (${{ env.BE_TAG }})
         uses: actions/checkout@v3
+        if: github.event.inputs.be-tag != ''
         with:
           repository: ${{ env.LEMMY_ORG }}/${{ env.BE_REPO }}
-          ref: ${{ env.TAG }}
+          ref: ${{ env.BE_TAG }}
           path: ${{ env.BE_REPO }}
           submodules: recursive
-      - name: Override Dockerfiles
-        run: cp -f ./Dockerfile-frontend ./${{ env.FE_REPO }}/Dockerfile && cp -f ./Dockerfile-backend ./${{ env.BE_REPO }}/Dockerfile
+      - name: Override Frontend Dockerfile
+        if: env.FE_TAG != ''
+        run: cp -f ./Dockerfile-frontend ./${{ env.FE_REPO }}/Dockerfile
+      - name: Override Backend Dockerfile
+        if: github.event.inputs.be-tag != ''
+        run: cp -f ./Dockerfile-backend ./${{ env.BE_REPO }}/Dockerfile
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to GitHub Container Registry
@@ -66,199 +114,54 @@ jobs:
           registry: ${{ env.DST_REGISTRY }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push frontend (${{ env.TAG }}, x64)
+      - name: Build and push Frontend (${{ env.FE_TAG }}, ${{ matrix.docker-target }})
+        if: env.FE_TAG != ''
         uses: docker/build-push-action@v4
         with:
           context: ./${{ env.FE_REPO }}
           file: ./${{ env.FE_REPO }}/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ matrix.docker-target }}
           push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.TAG }}-x64
-      - name: Build and push backend (${{ env.TAG }}, x64)
+          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.FE_TAG }}-${{ matrix.target-short }}
+      - name: Build and push Backend (${{ env.BE_TAG }}, ${{ matrix.docker-target }})
+        if: github.event.inputs.be-tag != ''
         uses: docker/build-push-action@v4
         with:
           context: ./${{ env.BE_REPO }}
           file: ./${{ env.BE_REPO }}/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ matrix.docker-target }}
           push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.TAG }}-x64
+          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.BE_TAG }}-${{ matrix.target-short }}
 
-  stop-x64-runner:
-    needs: [launch-x64-runner,build-x64-images]
+  stop-runners:
+    needs: [launch-runners,build-images]
     runs-on: ubuntu-latest
-    if: always()
+    if: github.event.inputs.fe-tag != '' || github.event.inputs.be-tag != ''
+    strategy:
+      matrix:
+        include:
+          - shutdown-label: ${{ needs.launch-runners.outputs.amd64_label }}
+            docker-target: "linux/amd64"
+            runner-arch: "x64"
+          - shutdown-label: ${{ needs.launch-runners.outputs.arm_label }}
+            docker-target: "linux/arm/v7"
+            runner-arch: "arm64"
+          - shutdown-label: ${{ needs.launch-runners.outputs.arm64_label }}
+            docker-target: "linux/arm64"
+            runner-arch: "arm64"
     steps:
-      - name: Terminate Runner
+      - name: Terminate Runner (${{ matrix.runner-arch }}, ${{ matrix.docker-target }})
         uses: ubergeek77/aws-ec2-spot-runner@v1
         with:
-          shutdown-label: ${{ needs.launch-x64-runner.outputs.label }}
+          shutdown-label: ${{ matrix.shutdown-label }}
           github-token: ${{ secrets.RUNNER_TOKEN }}
           github-repo: ${{ github.repository }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-  launch-arm-runner:
-    runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.launch.outputs.label}}
-    steps:
-      - id: launch
-        name: Launch Spot Runner
-        uses: ubergeek77/aws-ec2-spot-runner@v1
-        with:
-          ec2-ami: "ami-08fdd91d87f63bb09"
-          ec2-instance-type: "c6gn.large"
-          runner-arch: "arm64"
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ec2-keypair-name: ${{ secrets.EC2_KEYPAIR }}
-          ec2-security-group-id: ${{ secrets.EC2_SG }}
-          github-repo: ${{ github.repository }}
-          github-token: ${{ secrets.RUNNER_TOKEN }}
-
-  build-arm-images:
-    needs: launch-arm-runner
-    runs-on: ${{ needs.launch-arm-runner.outputs.label }}
-    steps:
-      - name: Checkout Build Files
-        uses: actions/checkout@v3
-      - name: Checkout Lemmy Frontend Source (${{ env.TAG }})
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.LEMMY_ORG }}/${{ env.FE_REPO }}
-          ref: ${{ env.TAG }}
-          path: ${{ env.FE_REPO }}
-          submodules: recursive
-      - name: Checkout Lemmy Backend Source
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.LEMMY_ORG }}/${{ env.BE_REPO }}
-          ref: ${{ env.TAG }}
-          path: ${{ env.BE_REPO }}
-          submodules: recursive
-      - name: Override Dockerfiles
-        run: cp -f ./Dockerfile-frontend ./${{ env.FE_REPO }}/Dockerfile && cp -f ./Dockerfile-backend ./${{ env.BE_REPO }}/Dockerfile
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.DST_REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push frontend (${{ env.TAG }}, ARM32v7)
-        uses: docker/build-push-action@v4
-        with:
-          context: ./${{ env.FE_REPO }}
-          file: ./${{ env.FE_REPO }}/Dockerfile
-          platforms: linux/arm/v7
-          push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.TAG }}-arm
-      - name: Build and push backend (${{ env.TAG }}, ARM32v7)
-        uses: docker/build-push-action@v4
-        with:
-          context: ./${{ env.BE_REPO }}
-          file: ./${{ env.BE_REPO }}/Dockerfile
-          platforms: linux/arm/v7
-          push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.TAG }}-arm
-
-  stop-arm-runner:
-    needs: [launch-arm-runner,build-arm-images]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Terminate Runner
-        uses: ubergeek77/aws-ec2-spot-runner@v1
-        with:
-          shutdown-label: ${{ needs.launch-arm-runner.outputs.label }}
-          github-token: ${{ secrets.RUNNER_TOKEN }}
-          github-repo: ${{ github.repository }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-  launch-arm64-runner:
-    runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.launch.outputs.label}}
-    steps:
-      - id: launch
-        name: Launch Spot Runner
-        uses: ubergeek77/aws-ec2-spot-runner@v1
-        with:
-          ec2-ami: "ami-08fdd91d87f63bb09"
-          ec2-instance-type: "c6gn.large"
-          runner-arch: "arm64"
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ec2-keypair-name: ${{ secrets.EC2_KEYPAIR }}
-          ec2-security-group-id: ${{ secrets.EC2_SG }}
-          github-repo: ${{ github.repository }}
-          github-token: ${{ secrets.RUNNER_TOKEN }}
-
-  build-arm64-images:
-    needs: launch-arm64-runner
-    runs-on: ${{ needs.launch-arm64-runner.outputs.label }}
-    steps:
-      - name: Checkout Build Files
-        uses: actions/checkout@v3
-      - name: Checkout Lemmy Frontend Source (${{ env.TAG }})
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.LEMMY_ORG }}/${{ env.FE_REPO }}
-          ref: ${{ env.TAG }}
-          path: ${{ env.FE_REPO }}
-          submodules: recursive
-      - name: Checkout Lemmy Backend Source
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.LEMMY_ORG }}/${{ env.BE_REPO }}
-          ref: ${{ env.TAG }}
-          path: ${{ env.BE_REPO }}
-          submodules: recursive
-      - name: Override Dockerfiles
-        run: cp -f ./Dockerfile-frontend ./${{ env.FE_REPO }}/Dockerfile && cp -f ./Dockerfile-backend ./${{ env.BE_REPO }}/Dockerfile
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.DST_REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push frontend (${{ env.TAG }}, ARM64)
-        uses: docker/build-push-action@v4
-        with:
-          context: ./${{ env.FE_REPO }}
-          file: ./${{ env.FE_REPO }}/Dockerfile
-          platforms: linux/arm64
-          push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.TAG }}-arm64
-      - name: Build and push backend (${{ env.TAG }}, ARM64)
-        uses: docker/build-push-action@v4
-        with:
-          context: ./${{ env.BE_REPO }}
-          file: ./${{ env.BE_REPO }}/Dockerfile
-          platforms: linux/arm64
-          push: true
-          tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.TAG }}-arm64
-
-  stop-arm64-runner:
-    needs: [launch-arm64-runner,build-arm64-images]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Terminate Runner
-        uses: ubergeek77/aws-ec2-spot-runner@v1
-        with:
-          shutdown-label: ${{ needs.launch-arm64-runner.outputs.label }}
-          github-token: ${{ secrets.RUNNER_TOKEN }}
-          github-repo: ${{ github.repository }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          
   squash-images:
-    needs: [build-x64-images,build-arm-images,build-arm64-images]
+    needs: build-images
+    if: github.event.inputs.fe-tag != '' || github.event.inputs.be-tag != ''
     runs-on: ubuntu-latest
     steps:
       - name: Login to GitHub Container Registry
@@ -268,18 +171,20 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Squash Frontend Multiarch Tags
+        if: env.FE_TAG != ''
         uses: ubergeek77/squash-docker-tags@v1
         with:
           source-tags: |
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.TAG }}-x64
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.TAG }}-arm
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.TAG }}-arm64
-          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.TAG }}
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.FE_TAG }}-amd64
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.FE_TAG }}-arm
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.FE_TAG }}-arm64
+          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.FE_REPO }}:${{ env.FE_TAG }}
       - name: Squash Backend Multiarch Tags
+        if: github.event.inputs.be-tag != ''
         uses: ubergeek77/squash-docker-tags@v1
         with:
           source-tags: |
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.TAG }}-x64
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.TAG }}-arm
-            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.TAG }}-arm64
-          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.TAG }}
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.BE_TAG }}-amd64
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.BE_TAG }}-arm
+            ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.BE_TAG }}-arm64
+          destination-tag: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}:${{ env.BE_TAG }}
