@@ -127,7 +127,7 @@ jobs:
         with:
           context: ./${{ env.BE_REPO }}
           file: ./${{ env.BE_REPO }}/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ matrix.docker-target }}
           push: true
           tags: ${{ env.DST_REGISTRY }}/${{ github.repository_owner }}/${{ env.BE_REPO }}-staging:${{ env.BE_TAG }}-${{ matrix.target-short }}
   stop-runners:
