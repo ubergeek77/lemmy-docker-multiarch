@@ -59,7 +59,7 @@ jobs:
           dry-run: true
       - name: Export Runner Label
         id: save-labels
-        run: echo "${{ matrix.target-short }}_label=${{ steps.launch.outputs.label }}"
+        run: echo "${{ matrix.target-short }}_label=${{ steps.launch.outputs.label }}" >> $GITHUB_OUTPUT
     outputs:
       amd64_label: ${{ steps.launch.outputs.amd64_label }}
       arm_label: ${{ steps.launch.outputs.arm_label }}
