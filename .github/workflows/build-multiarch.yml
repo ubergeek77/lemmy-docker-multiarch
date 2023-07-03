@@ -133,7 +133,7 @@ jobs:
   stop-runners:
     needs: [launch-runners,build-images]
     runs-on: ubuntu-latest
-    if: always()
+    if: github.event.inputs.fe-tag != '' || github.event.inputs.be-tag != ''
     strategy:
       matrix:
         include:
