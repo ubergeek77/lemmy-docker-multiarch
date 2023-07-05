@@ -8,7 +8,7 @@ Builds [`LemmyNet/lemmy`](https://github.com/LemmyNet/lemmy/) and [`LemmyNet/lem
 
 - x64 (`amd64`)
 - ARM (`arm/v7`)
-- ARM64 (`aarch64`)
+- ARM64 (`arm64`)
 
 I made these because the Lemmy project does not currently support ARM, [and has been deliberating how to create ARM builds since `0.17.4`](https://github.com/LemmyNet/lemmy/issues/3102). The Dockerfiles I use, and the workflow I use to compile these images, are all open source here. [You can see the logs of previous runs on the Actions tab](https://github.com/ubergeek77/lemmy-docker-multiarch/actions/workflows/build-multiarch.yml).
 
