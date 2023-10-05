@@ -9,7 +9,7 @@ RUN cd /app && \
   CGO_ENABLED=0 go build
 
 # Original Dockerfile below (mostly)
-FROM node:20.2-alpine as builder
+FROM node:alpine as builder
 
 # Added vips-dev and pkgconfig so that local vips is used instead of prebuilt
 # Done for two reasons:
