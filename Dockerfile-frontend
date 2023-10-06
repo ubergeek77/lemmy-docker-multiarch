@@ -11,6 +11,10 @@ RUN cd /app && \
 # Original Dockerfile below (mostly)
 FROM node:alpine as builder
 
+# Lemmy uses a bleeding edge version of vips, and the necessary version is only available in Alpine edge
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+
 # Added vips-dev and pkgconfig so that local vips is used instead of prebuilt
 # Done for two reasons:
 # - libvips binaries are not available for ARM32
@@ -60,7 +64,11 @@ RUN rm -rf ./node_modules/npm
 RUN du -sh ./node_modules/* | sort -nr | grep '\dM.*'
 
 FROM node:alpine as runner
-RUN apk add vips-cpp
+# Lemmy uses a bleeding edge version of vips, and the necessary version is only available in Alpine edge
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+
+RUN apk update && apk upgrade && apk add vips-cpp
 COPY --from=builder /usr/src/app/dist /app/dist
 COPY --from=builder /usr/src/app/node_modules /app/node_modules
 
