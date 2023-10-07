@@ -9,17 +9,13 @@ RUN cd /app && \
   CGO_ENABLED=0 go build
 
 # Original Dockerfile below (mostly)
-FROM node:alpine as builder
-
-# Lemmy uses a bleeding edge version of vips, and the necessary version is only available in Alpine edge
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" > /etc/apk/repositories && \
-    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+FROM node:alpine3.17 as builder
 
 # Added vips-dev and pkgconfig so that local vips is used instead of prebuilt
 # Done for two reasons:
 # - libvips binaries are not available for ARM32
 # - It can break depending on the CPU (https://github.com/LemmyNet/lemmy-ui/issues/1566)
-RUN apk update && apk upgrade && apk add --no-cache curl yarn python3 build-base gcc wget git vips-dev pkgconfig
+RUN apk update && apk add --no-cache curl yarn python3 build-base gcc wget git vips-dev pkgconfig
 
 # Install node-gyp
 RUN npm install -g node-gyp
@@ -63,12 +59,8 @@ RUN rm -rf ./node_modules/npm
 
 RUN du -sh ./node_modules/* | sort -nr | grep '\dM.*'
 
-FROM node:alpine as runner
-# Lemmy uses a bleeding edge version of vips, and the necessary version is only available in Alpine edge
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" > /etc/apk/repositories && \
-    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
-
-RUN apk update && apk upgrade && apk add vips-cpp
+FROM node:alpine3.17 as runner
+RUN apk add vips-cpp
 COPY --from=builder /usr/src/app/dist /app/dist
 COPY --from=builder /usr/src/app/node_modules /app/node_modules
 
