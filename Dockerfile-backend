@@ -44,7 +44,7 @@ ARG DEBIAN_FRONTEND noninteractive
 ARG DEBCONF_NONINTERACTIVE_SEEN true
 
 RUN apt-get update \
- && apt-get -y install --no-install-recommends tini postgresql-client libssl3 ca-certificates \
+ && apt-get -y install --no-install-recommends postgresql-client libssl3 ca-certificates \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
