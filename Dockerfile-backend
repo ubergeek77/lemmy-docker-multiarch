@@ -39,8 +39,14 @@ RUN --mount=type=cache,target=/lemmy/target set -ex; \
 
 FROM ${RUNNER_IMAGE} AS runner-linux
 
-# Federation needs CA certificates
-RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates
+ARG DEBCONF_NOWARNINGS="yes"
+ARG DEBIAN_FRONTEND noninteractive
+ARG DEBCONF_NONINTERACTIVE_SEEN true
+
+RUN apt-get update \
+ && apt-get -y install --no-install-recommends postgresql-client libssl3 ca-certificates \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --from=build --chmod=0755 /lemmy/lemmy_server /usr/local/bin
 
