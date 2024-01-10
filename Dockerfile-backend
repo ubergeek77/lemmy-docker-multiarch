@@ -1,55 +1,57 @@
-FROM rust:1.70-slim-buster as builder
-
-# Install compilation dependencies
-RUN apt-get update \
- && apt-get -y install --no-install-recommends libssl-dev pkg-config libpq-dev git \
- && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# comma-seperated list of features to enable
+# syntax=docker/dockerfile:1.6
+ARG RUST_VERSION=1.75
 ARG CARGO_BUILD_FEATURES=default
+ARG RUST_RELEASE_MODE=release
 
-# This can be set to release using --build-arg
-ARG RUST_RELEASE_MODE="release"
+ARG BUILDER_IMAGE=rust:${RUST_VERSION}
+ARG RUNNER_IMAGE=debian:bookworm-slim
 
-COPY . .
+ARG UNAME=lemmy
+ARG UID=1000
+ARG GID=1000
 
-# Build the project
+# AMD64 builder
+FROM ${BUILDER_IMAGE} AS build
 
-# Debug mode build
-RUN --mount=type=cache,target=/app/target \
-    if [ "$RUST_RELEASE_MODE" = "debug" ] ; then \
-      echo "pub const VERSION: &str = \"$(git describe --tag)\";" > "crates/utils/src/version.rs" \
-      && echo "Building Lemmy $(git describe --tag), Cargo Target: $(rustc -vV | sed -n 's|host: ||p'), Mode: $RUST_RELEASE_MODE" \
-      && cargo build --features ${CARGO_BUILD_FEATURES} \
-      && cp ./target/$RUST_RELEASE_MODE/lemmy_server /app/lemmy_server; \
+ARG CARGO_BUILD_FEATURES
+ARG RUST_RELEASE_MODE
+
+WORKDIR /lemmy
+
+COPY . ./
+
+# Debug build
+RUN --mount=type=cache,target=/lemmy/target set -ex; \
+    if [ "${RUST_RELEASE_MODE}" = "debug" ]; then \
+        echo "pub const VERSION: &str = \"$(git describe --tag)\";" > crates/utils/src/version.rs; \
+        cargo build --features "${CARGO_BUILD_FEATURES}"; \
+        mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
     fi
 
-# Release mode build
-RUN \
-    if [ "$RUST_RELEASE_MODE" = "release" ] ; then \
-      echo "pub const VERSION: &str = \"$(git describe --tag)\";" > "crates/utils/src/version.rs" \
-      && echo "Building Lemmy $(git describe --tag), Cargo Target: $(rustc -vV | sed -n 's|host: ||p'), Mode: $RUST_RELEASE_MODE" \
-      && cargo build --features ${CARGO_BUILD_FEATURES} --release \
-      && cp ./target/$RUST_RELEASE_MODE/lemmy_server /app/lemmy_server; \
+# Release build
+RUN --mount=type=cache,target=/lemmy/target set -ex; \
+    if [ "${RUST_RELEASE_MODE}" = "release" ]; then \
+        echo "pub const VERSION: &str = \"$(git describe --tag)\";" > crates/utils/src/version.rs; \
+        [ -z "$USE_RELEASE_CACHE" ] && cargo clean --release; \
+        cargo build --features "${CARGO_BUILD_FEATURES}" --release; \
+        mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
     fi
 
-# The Debian runner
-FROM debian:buster-slim as lemmy
+FROM ${RUNNER_IMAGE} AS runner-linux
 
-# Install libpq for postgres
-RUN apt-get update \
- && apt-get -y install --no-install-recommends postgresql-client libc6 libssl1.1 ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+# Federation needs CA certificates
+RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates
 
-RUN addgroup --gid 1000 lemmy
-RUN useradd --no-create-home --shell /bin/sh --uid 1000 --gid 1000 lemmy
+COPY --from=build --chmod=0755 /lemmy/lemmy_server /usr/local/bin
 
-# Copy resources
-COPY --chown=lemmy:lemmy --from=builder /app/lemmy_server /app/lemmy
+ARG UNAME
+ARG GID
+ARG UID
 
-RUN chown lemmy:lemmy /app/lemmy
-USER lemmy
+RUN groupadd -g ${GID} -o ${UNAME} && \
+    useradd -m -u ${UID} -g ${GID} -o -s /bin/bash ${UNAME}
+USER $UNAME
 
-CMD ["/app/lemmy"]
+ENTRYPOINT ["lemmy_server"]
+EXPOSE 8536
+STOPSIGNAL SIGTERM
