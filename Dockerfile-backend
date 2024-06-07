@@ -10,8 +10,10 @@ ARG UNAME=lemmy
 ARG UID=1000
 ARG GID=1000
 
-# AMD64 builder
 FROM ${BUILDER_IMAGE} AS build
+
+# These packages are needed when building on ARM/ARM64, but not on x86 for some reason?
+RUN apt update && apt install -y clang cmake git golang libclang-dev libssl-dev ninja-build perl
 
 ARG CARGO_BUILD_FEATURES
 ARG RUST_RELEASE_MODE
