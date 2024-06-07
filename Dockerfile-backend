@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-ARG RUST_VERSION=1.76
+ARG RUST_VERSION=1.78
 ARG CARGO_BUILD_FEATURES=default
 ARG RUST_RELEASE_MODE=release
 
@@ -31,16 +31,15 @@ RUN --mount=type=cache,target=/lemmy/target set -ex; \
 # Release build
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
     if [ "${RUST_RELEASE_MODE}" = "release" ]; then \
-        echo "pub const VERSION: &str = \"$(git describe --tag)\";" > crates/utils/src/version.rs; \
-        [ -z "$USE_RELEASE_CACHE" ] && cargo clean --release; \
+        cargo clean --release; \
         cargo build --features "${CARGO_BUILD_FEATURES}" --release; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
     fi
 
 FROM ${RUNNER_IMAGE} AS runner-linux
 
-# Federation needs CA certificates
-RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates
+# Add system packages that are needed: federation needs CA certificates, curl can be used for healthchecks
+RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates curl
 
 COPY --from=build --chmod=0755 /lemmy/lemmy_server /usr/local/bin
 
