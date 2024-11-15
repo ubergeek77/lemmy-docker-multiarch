@@ -1,5 +1,5 @@
-# syntax=docker/dockerfile:1.7
-ARG RUST_VERSION=1.80
+# syntax=docker/dockerfile:1.10
+ARG RUST_VERSION=1.81
 ARG CARGO_BUILD_FEATURES=default
 ARG RUST_RELEASE_MODE=release
 
@@ -29,6 +29,9 @@ RUN --mount=type=cache,target=/lemmy/target set -ex; \
         RUST_BACKTRACE=full cargo build --features "${CARGO_BUILD_FEATURES}"; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
     fi
+
+# Note: The upstream images now use upx to compress the binary
+# But to simplify cross-architecture deployment, this image does not do this
 
 # Release build
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
