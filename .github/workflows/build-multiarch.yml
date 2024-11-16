@@ -32,17 +32,17 @@ jobs:
             docker-target: "linux/amd64"
             target-short: "amd64"
             ec2-ami: "ami-036841078a4b68e14"
-            ec2-instance-type: "c5d.4xlarge"
+            ec2-instance-type: "r6in.large" # Cheapest x86 Spot Price with >=8GB RAM
           - runner-arch: "arm64"
             docker-target: "linux/arm/v7"
             target-short: "arm"
             ec2-ami: "ami-0560690593473ded1"
-            ec2-instance-type: "c6gn.4xlarge"
+            ec2-instance-type: "m8g.2xlarge" # Cheapest ARM64 Spot Price with >=32GB RAM, compiling for ARM needs a ton for some reason
           - runner-arch: "arm64"
             docker-target: "linux/arm64"
             target-short: "arm64"
             ec2-ami: "ami-0560690593473ded1"
-            ec2-instance-type: "c6gn.4xlarge"
+            ec2-instance-type: "r8g.medium" # Cheapest ARM64 Spot Price with >=8GB RAM
     steps:
       - name: Launch Spot Runner (${{ matrix.runner-arch }}, ${{ matrix.docker-target }})
         id: launch
