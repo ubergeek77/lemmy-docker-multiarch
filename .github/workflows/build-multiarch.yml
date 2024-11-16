@@ -37,7 +37,7 @@ jobs:
             docker-target: "linux/arm/v7"
             target-short: "arm"
             ec2-ami: "ami-0560690593473ded1"
-            ec2-instance-type: "m8g.2xlarge" # Cheapest ARM64 Spot Price with >=32GB RAM, compiling for ARM needs a ton for some reason
+            ec2-instance-type: "x2gd.large" # Cheapest 32-bit-compatible ARM64 Spot Price with >=32GB RAM, compiling for ARM needs a ton for some reason
           - runner-arch: "arm64"
             docker-target: "linux/arm64"
             target-short: "arm64"
