@@ -18,6 +18,7 @@ RUN apt update && apt install -y clang cmake git golang libclang-dev libssl-dev 
 ARG CARGO_BUILD_FEATURES
 ARG RUST_RELEASE_MODE
 ARG RUSTFLAGS
+ARG TARGETARCH
 
 WORKDIR /lemmy
 
@@ -26,19 +27,30 @@ COPY . ./
 # Debug build
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
     if [ "${RUST_RELEASE_MODE}" = "debug" ]; then \
-        RUST_BACKTRACE=full RUSTFLAGS="-Ccodegen-units=16" cargo build --features "${CARGO_BUILD_FEATURES}"; \
+        RUST_BACKTRACE=full cargo build --features "${CARGO_BUILD_FEATURES}"; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
     fi
 
-# Note: The upstream images now use upx to compress the binary
-# But to simplify cross-architecture deployment, this image does not do this
+# Build with 16 codegen units 32-bit architectures due to build issues
+if [[ "$(getconf LONG_BIT)" == "32" ]]; then
+    RUSTFLAGS='RUSTFLAGS=-Ccodegen-units=16'
+fi
 
 # Release build
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
     if [ "${RUST_RELEASE_MODE}" = "release" ]; then \
         cargo clean --release; \
-        RUST_BACKTRACE=full cargo build --features "${CARGO_BUILD_FEATURES}" --release; \
+        RUST_BACKTRACE=full ${RUSTFLAGS} cargo build --features "${CARGO_BUILD_FEATURES}" --release; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
+
+        # Compress the binary with upx
+        # Skip this step on 32-but architectures
+        if [[ "$(getconf LONG_BIT)" == "64" ]]; then
+            wget https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-${TARGETARCH}_linux.tar.xz; \
+            tar -xvf upx-4.2.4-${TARGETARCH}_linux.tar.xz; \
+            cp upx-4.2.4-${TARGETARCH}_linux/upx /usr/bin; \
+            upx --best --lzma /home/lemmy/lemmy_server; \
+        fi
     fi
 
 FROM ${RUNNER_IMAGE} AS runner-linux
