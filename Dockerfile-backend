@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/lemmy/target set -ex; \
             tar -xvf upx-4.2.4-${TARGETARCH}_linux.tar.xz; \
             cp upx-4.2.4-${TARGETARCH}_linux/upx /usr/bin; \
             upx --best --lzma /home/lemmy/lemmy_server; \
-        fi
+        fi \
     fi
 
 FROM ${RUNNER_IMAGE} AS runner-linux
