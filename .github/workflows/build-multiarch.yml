@@ -37,12 +37,12 @@ jobs:
             docker-target: "linux/arm/v7"
             target-short: "arm"
             ec2-ami: "ami-0560690593473ded1"
-            ec2-instance-type: "r6g.2xlarge"
+            ec2-instance-type: "x8g.medium"
           - runner-arch: "arm64"
             docker-target: "linux/arm64"
             target-short: "arm64"
             ec2-ami: "ami-0560690593473ded1"
-            ec2-instance-type: "r8g.medium"
+            ec2-instance-type: "x8g.medium"
     steps:
       - name: Launch Spot Runner (${{ matrix.runner-arch }}, ${{ matrix.docker-target }})
         id: launch
