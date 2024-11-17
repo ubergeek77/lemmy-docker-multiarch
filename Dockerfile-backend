@@ -26,7 +26,7 @@ COPY . ./
 # Debug build
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
     if [ "${RUST_RELEASE_MODE}" = "debug" ]; then \
-        RUST_BACKTRACE=full cargo build --features "${CARGO_BUILD_FEATURES}"; \
+        RUST_BACKTRACE=full RUSTFLAGS="-Ccodegen-units=16" cargo build --features "${CARGO_BUILD_FEATURES}"; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
     fi
 
