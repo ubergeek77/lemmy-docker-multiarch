@@ -35,11 +35,11 @@ RUN --mount=type=cache,target=/lemmy/target set -ex; \
 RUN --mount=type=cache,target=/lemmy/target set -ex; \
     # Build with 16 codegen units 32-bit architectures due to build issues
     if [ "$(getconf LONG_BIT)" = "32" ]; then \
-        RUSTFLAGS='RUSTFLAGS=-Ccodegen-units=16'; \
+        export RUSTFLAGS="-Ccodegen-units=16"; \
     fi; \
     if [ "${RUST_RELEASE_MODE}" = "release" ]; then \
         cargo clean --release; \
-        RUST_BACKTRACE=full ${RUSTFLAGS} cargo build --features "${CARGO_BUILD_FEATURES}" --release; \
+        RUST_BACKTRACE=full cargo build --features "${CARGO_BUILD_FEATURES}" --release; \
         mv target/"${RUST_RELEASE_MODE}"/lemmy_server ./lemmy_server; \
 
         # Compress the binary with upx
